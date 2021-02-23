@@ -18,7 +18,6 @@ namespace Test_technique.Controllers
         {
             var database = client.GetDatabase("calendar");
             _events = database.GetCollection<CalendarEvent>("events");
-            BsonSerializer.RegisterSerializer(typeof(DateTime), DateTimeSerializer.LocalInstance);
         }
 
         [HttpGet("")]

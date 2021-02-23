@@ -12,8 +12,10 @@ namespace Test_technique.Models
         
         public string Title { get; set; }
         
-        public DateTime StartDate { get; set; }
+        public DateTime Start { get; set; }
         
-        public DateTime EndDate { get; set; }
+        public DateTime End { get; set; }
+        
+        public bool AllDay { get; set; }
     }
 }
