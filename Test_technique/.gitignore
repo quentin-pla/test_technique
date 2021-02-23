@@ -233,3 +233,6 @@ _Pvt_Extensions
 
 # Fichiers IDEA
 .idea/
+
+# Fichier typescript
+react-app-env.d.ts
