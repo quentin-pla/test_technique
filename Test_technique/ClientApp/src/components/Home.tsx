@@ -1,76 +1,128 @@
-import React, {Component, FunctionComponent, SyntheticEvent, useEffect, useState} from 'react';
+import React, {Component, FunctionComponent, useEffect, useState} from 'react';
 import { EventApi, DateSelectArg, EventClickArg } from "@fullcalendar/react";
 import { Calendar } from "@fullcalendar/core";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import {Dropdown, Flex, Dialog, Input, Button, Form, Checkbox} from '@fluentui/react-northstar';
-import { CloseIcon } from '@fluentui/react-icons-northstar'
+import {Dropdown, Flex, Dialog, Input, Button, Form, Checkbox, Text, MenuButton, Loader} from '@fluentui/react-northstar';
+import { CloseIcon, ArrowRightIcon, ArrowLeftIcon } from '@fluentui/react-icons-northstar'
 
+/**
+ * Données d'une réunion
+ */
 interface EventData {
+    // Titre
     title?: string,
+    // Départ
     start?: Date,
+    // Fin
     end?: Date,
-    allDay?: boolean
+    // Journée entière ?
+    allDay?: boolean,
 }
 
-
+/**
+ * Props
+ */
 type Props = {}
+
+/**
+ * État
+ */
 type State = {
+    // Évènements
     currentEvents: EventApi[],
+    // Date du jour
     todayStr: string,
+    // Erreur ?
     isError: boolean,
-    eventCount: number,
+    // Calendrier
     calendar: null|Calendar,
+    // Dialogue de création de réunion ouvert ?
     openEventDialog: boolean,
-    eventData: EventData
+    // Données pour créer une réunion
+    eventData: EventData,
+    // Heure de début pour les réunions (Format 24H)
+    startHour: number,
+    // Heure de fin pour les réunions (Format 24H)
+    endHour: number,
+    // Chargement de la page
+    loaded: boolean
 }
 
+/**
+ * Page d'accueil
+ */
 export class Home extends Component<Props, State> {
     static displayName = Home.name;
-    
+
+    /**
+     * Référence du calendrier 
+     */
     private readonly calendarRef: React.RefObject<HTMLDivElement>;
 
+    /**
+     * Constructeur
+     * @param props props
+     */
     constructor(props: Props) {
         super(props);
         this.calendarRef = React.createRef();
     }
-    
+
+    /**
+     * État initial du composant
+     */
     state: State = {
         currentEvents: [],
         todayStr: new Date().toISOString().replace(/T.*$/, ''),
         isError: false,
-        eventCount: 0,
         calendar: null,
         openEventDialog: false,
-        eventData: {}
+        eventData: {},
+        startHour: 8,
+        endHour: 19,
+        loaded: false
     };
 
+    /**
+     * Initialisation du composant
+     */
     componentDidMount() {
         let calendar = new Calendar(this.calendarRef.current as HTMLElement, {
-            height: "500px",
             plugins: [dayGridPlugin, interactionPlugin, timeGridPlugin],
             headerToolbar: false,
             initialView: 'dayGridMonth',
             editable: true,
             selectable: true,
-            selectMirror: true,
             events: this.handleInitEvent,
             select: this.handleDateSelect,
-            eventClick: this.handleEventClick,
             eventsSet: this.handleEventsUpdate,
             locale: 'fr',
             firstDay: 1,
-            dayHeaderFormat: {
-                weekday: 'long',
-                month: 'numeric',
-                day: 'numeric'
+            height: "500px",
+            validRange: {
+                start: new Date()
+            },
+            businessHours: {
+                daysOfWeek: [ 1, 2, 3, 4, 5 ],
+                startTime: this.state.startHour + ":00",
+                endTime: this.state.endHour + ":00",
+            },
+            selectConstraint: {
+                daysOfWeek: [ 1, 2, 3, 4, 5 ],
             }
         });
         calendar.render();
         this.setState({calendar});
     }
 
+    /**
+     * Initialiser les réunions présentes dans la base de données
+     * @param fetchInfo informations sur les dates visibles du calendrier
+     * @param successCallback méthode de retour en cas de succès
+     * @param failureCallback méthode de retour en cas d'échec
+     */
     handleInitEvent = (fetchInfo: object, successCallback: Function, failureCallback: Function) => {
         const requestOptions = {
             method: 'GET',
@@ -82,12 +134,17 @@ export class Home extends Component<Props, State> {
                 failureCallback();
             } else {
                 res.json().then(json => {
+                    this.setState({loaded: true});
                     successCallback(json);
                 });
             }
         });
     }
 
+    /**
+     * Lorsqu'une date est sélectionnée
+     * @param selectInfo informations sur la date sélectionnée
+     */
     handleDateSelect = (selectInfo: DateSelectArg) => {
         this.setState({
             openEventDialog: true,
@@ -98,7 +155,11 @@ export class Home extends Component<Props, State> {
             }
         });
     }
-    
+
+    /**
+     * Sauvegarder une réunion dans la base de données
+     * @param eventData données de la réunion à sauvegarder
+     */
     uploadEvent(eventData: object) {
         const requestOptions = {
             method: 'POST',
@@ -114,7 +175,14 @@ export class Home extends Component<Props, State> {
             }
         });
     }
-    
+
+    /**
+     * Créer une réunion
+     * @param title titre
+     * @param allDay toute la journée ?
+     * @param beginHour heure de début
+     * @param duration durée
+     */
     createEvent = (title: string, allDay: boolean, beginHour: string, duration: number) => {
         const event : EventData = {...this.state.eventData, title, allDay};
         if (!allDay) {
@@ -125,23 +193,27 @@ export class Home extends Component<Props, State> {
         this.uploadEvent(event);
     }
 
-    handleEventClick = (clickInfo: EventClickArg) => {
-       //
-    }
-
+    /**
+     * Mise à jour des réunions du calendrier
+     * @param events réunions
+     */
     handleEventsUpdate = (events: EventApi[]) => {
         this.setState({currentEvents: events});
     }
 
+    /**
+     * Changer la vue du calendrier
+     * @param index index
+     */
     changeCalendarView (index: number) {
         switch (index) {
-            case 0:
+            case 1:
                 this.state.calendar!.changeView("dayGridMonth");
                 break;
-            case 1:
+            case 2:
                 this.state.calendar!.changeView("dayGridWeek");
                 break;
-            case 2:
+            case 3:
                 this.state.calendar!.changeView("timeGridDay");
                 break;
             default:
@@ -149,57 +221,154 @@ export class Home extends Component<Props, State> {
         }
     }
 
+    /**
+     * Rendu
+     */
     render() {
+        // Vues du calendrier
         const calendarViews = ["Mois","Semaine","Jour"];
         
         return (
             <Flex fill={true} column={true} padding="padding.medium" gap="gap.small">
                 <Flex gap="gap.small">
-                    <Dropdown
-                        items={calendarViews}
-                        align={"start"}
-                        defaultValue={calendarViews[0]}
-                        checkable
-                        onChange={(event,dropdown) => {
-                            this.changeCalendarView(dropdown.highlightedIndex!);
-                        }}
-                    />
+                    <Flex.Item>
+                        <Button.Group
+                            circular
+                            buttons={[
+                                {
+                                    icon: <ArrowLeftIcon />,
+                                    key: 'left',
+                                    onClick: () => this.state.calendar?.prev()
+                                },
+                                {
+                                    icon: <ArrowRightIcon />,
+                                    key: 'right',
+                                    onClick: () => this.state.calendar?.next()
+                                },
+                            ]}
+                        />
+                    </Flex.Item>
+                    <Flex.Item grow={true}>
+                        <Text align={"center"}
+                              styles={{"text-transform": "capitalize"}}
+                              size={"larger"}
+                              content={this.state.calendar?.currentData.viewTitle} />
+                    </Flex.Item>
+                    <Flex.Item>
+                        <MenuButton
+                            menu={calendarViews}
+                            trigger={<Button content={"Affichage"} title="Modifier l'affichage du calendrier" />}
+                            defaultValue={calendarViews[0]}
+                            onMenuItemClick={(event,dropdown) => {
+                                this.changeCalendarView(dropdown?.itemPosition!);
+                            }}
+                        />
+                    </Flex.Item>
                 </Flex>
                 <Flex.Item grow={true}>
                     <div ref={this.calendarRef}/>
                 </Flex.Item>
-                <EventDialog
-                    open={this.state.openEventDialog}
-                    onHide={() => this.setState({openEventDialog: false})}
-                    createEvent={this.createEvent}
-                />
+                {this.state.eventData.start! ?
+                    <EventDialog
+                        open={this.state.openEventDialog}
+                        onHide={() => this.setState({openEventDialog: false})}
+                        date={this.state.eventData.start!}
+                        createEvent={this.createEvent}
+                        startHour={this.state.startHour}
+                        endHour={this.state.endHour}
+                    />
+                    :
+                    null
+                }
+                {!this.state.loaded ?
+                    <Dialog
+                        open={true}
+                        styles={{"max-height": "120px", "max-width": "250px"}}
+                        closeOnOutsideClick={false}
+                        content={<Loader label="Récupération des réunions" />}
+                    />
+                    :
+                    null
+                }
             </Flex>
         );
     }
 }
 
+/**
+ * Fenêtre de dialogue afin d'ajouter une réunion
+ * @param open état d'affichage du dialogue
+ * @param onHide lors de la fermeture du dialogue
+ * @param date date sélectionnée
+ * @param createEvent créer une nouvelle réunion
+ * @param startHour heure de départ autorisée pour les réunions
+ * @param endHour heure de fin des réunions
+ * @param currentEvents évènements en cours
+ * @constructor
+ */
 const EventDialog: FunctionComponent<{
     open: boolean,
     onHide: Function,
-    createEvent: Function
-}> = ({ open, onHide, createEvent }) => {
+    date: Date,
+    createEvent: Function,
+    startHour: number,
+    endHour: number
+}> = ({ open, onHide, date, createEvent, startHour, endHour }) => {
+    /**
+     * Champs du formulaire valides
+     */
     const [valid, setValid] = useState(false);
-    const [allDay, setAllDay] = useState(true);
-    const [title, setTitle] = useState("");
-    const [beginHour, setBeginHour] = useState(undefined);
-    const [duration, setDuration] = useState(undefined);
-    const firstHour = 8;
-    const lastHour = 18;
 
+    /**
+     * Rendez-vous durant toute la journée ?
+     */
+    const [allDay, setAllDay] = useState(true);
+
+    /**
+     * Titre du rendez-vous
+     */
+    const [title, setTitle] = useState("");
+
+    /**
+     * Heure de début du rendez-vous
+     */
+    const [beginHour, setBeginHour] = useState(undefined);
+
+    /**
+     * Durée de rendez-vous
+     */
+    const [duration, setDuration] = useState(undefined);
+
+    /**
+     * Liste des durées disponibles
+     */
+    const [validDurations, setValidDurations] = useState([""]);
+
+    /**
+     * Liste des heures disponibles
+     */
+    const [validHours, setValidHours] = useState([""]);
+
+    /**
+     * Lorsqu'une mise à jour a été effectuée
+     */
     useEffect(() => {
         if (title === undefined) {
             setValid(false);
         } else {
             if (allDay) setValid(title.length > 0);
-            else setValid(title.length > 0 && beginHour !== undefined && duration !== undefined);
+            else {
+                updateValidHours();
+                setValid(title.length > 0 && beginHour !== undefined && duration !== undefined);
+            }
         }
+        if (beginHour !== undefined)
+            updateValidDurations();
     }, [open, allDay, title, beginHour, duration]);
 
+    /**
+     * Masquer la fenêtre de dialogue
+     */
     const hideDialog = () => {
         onHide();
         setValid(false);
@@ -207,15 +376,23 @@ const EventDialog: FunctionComponent<{
         setTitle("");
         setBeginHour(undefined);
         setDuration(undefined);
+        setValidDurations([""]);
+        setValidHours([""]);
     }
-    
-    const generateHoursValues = () => {
+
+    /**
+     * Générer les heures possibles de rendez-vous
+     */
+    function updateValidHours() {
         let hours = [];
-        for (let i = firstHour; i <= lastHour; i++)
+        for (let i = startHour; i < endHour; i++)
             hours.push(i + "H");
-        return hours;
+        setValidHours(hours);
     }
-    
+
+    /**
+     * Durées de rendez-vous
+     */
     const durationValues = {
         "10 minutes": 10,
         "30 minutes": 30,
@@ -227,6 +404,20 @@ const EventDialog: FunctionComponent<{
         "5H": 300
     };
 
+    /**
+     * Générer les durées possibles de rendez-vous
+     */
+    function updateValidDurations() {
+        let durations = [];
+        for (const [key, value] of Object.entries(durationValues))
+            if ((parseInt(beginHour!) * 60) + value <= endHour * 60)
+                durations.push(key);
+        setValidDurations(durations);
+    }
+
+    /**
+     * Champs du formulaire
+     */
     const formFields = [
         {
             label: "Nom de la réunion",
@@ -247,7 +438,7 @@ const EventDialog: FunctionComponent<{
             key: 'allDay',
             control: {
                 as: Checkbox,
-                label: 'Journée entière',
+                label: 'Journée entière (' + date.toLocaleDateString() + ")",
                 defaultChecked: true,
                 onClick: (event: any, data: any) => setAllDay(data.checked)
             },
@@ -258,7 +449,8 @@ const EventDialog: FunctionComponent<{
             key: 'eventBeginHour',
             control: {
                 as: Dropdown,
-                items: generateHoursValues(),
+                items: validHours,
+                disabled: title === undefined || title.length === 0,
                 onChange: (event: any, data: any) => setBeginHour(data!.value)
             },
         },
@@ -268,7 +460,8 @@ const EventDialog: FunctionComponent<{
             key: 'eventDuration',
             control: {
                 as: Dropdown,
-                items: Object.keys(durationValues),
+                items: validDurations,
+                disabled: beginHour === undefined,
                 onChange: (event: any, data: any) => setDuration(data!.value)
             },
         },
