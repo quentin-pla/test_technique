@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@fluentui/docs-components": "^0.52.1",
     "@fluentui/react-icons-northstar": "^0.52.0",
     "@fluentui/react-northstar": "^0.52.0",
     "@fullcalendar/core": "^5.5.1",
